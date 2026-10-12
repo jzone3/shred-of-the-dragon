@@ -103,7 +103,7 @@ const laneOf = m => {
   SEMIS.forEach((s, i) => { const d = Math.abs(pc - s); if (d < best) { best = d; rank = i; } });
   return Math.max(0, Math.min(4, Math.round(rank * 4 / 6) + oct));
 };
-const MIN_GAP = params.has('hard') ? 0 : 0.11;   // easy: thin 16ths -> 8ths
+const MIN_GAP = params.has('hard') ? 0 : params.has('baby') ? 0.6 : 0.11;   // thin dense sections
 const chart = lead.map(n => ({ t: n.t, lane: laneOf(n.m), hit: 0, missed: 0 }))
                   .sort((a, b) => a.t - b.t)
                   .filter((last => n => n.t - last >= MIN_GAP && (last = n.t, true))(-9));
@@ -200,7 +200,7 @@ addEventListener('pointerdown', () => {
 addEventListener('keyup', e => { if (e.code in keys) frets[keys[e.code]] = 0; });
 
 // ============ GAME STATE ============
-const WIN = params.has('hard') ? 0.13 : 0.16, APPROACH = 1.5;
+const WIN = params.has('hard') ? 0.13 : params.has('baby') ? 0.22 : 0.16, APPROACH = 1.5;
 let screen = 'title', score = 0, streak = 0, best = 0, mult = 1, hits = 0, judged = 0;
 let judgeTxt = '', judgeT = 0, flashes = [], auto = autoPlay;
 const songTime = () => actx ? actx.currentTime - audioStart + cal : -9;
@@ -258,6 +258,7 @@ function frame() {
     }
     if (st > chart[chart.length - 1].t + 2) screen = 'results';
   }
+  if (screen === 'title' && autoPlay && renderReady && actx && actx.state === 'running') startGame();
   if (startQueued || (strumQueued && screen !== 'play')) startGame();
   strumQueued = false; startQueued = false;
 
