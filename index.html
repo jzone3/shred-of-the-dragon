@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Guitar Hero — Shred of the Dragon</title>
+<style>
+  html,body{margin:0;height:100%;background:#0a0a12;overflow:hidden;font-family:'Avenir Next',system-ui,sans-serif}
+  canvas{display:block;width:100vw;height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+"use strict";
+// ============ SONG: "Shred of the Dragon" — original, ~200 BPM E harmonic minor ============
+const BPM = 200, BEAT = 60 / BPM;                 // 0.3s
+const SEMIS = [0, 2, 3, 5, 7, 8, 10];             // E harmonic minor degrees
+const midi = (deg, oct) => 64 + 12 * oct + SEMIS[((deg % 7) + 7) % 7] + 12 * Math.floor(deg / 7);
+const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+
+const lead = [], rhythm = [], bass = [], drums = [];   // {t:sec, m:midi, d:sec} / drums {t,k}
+let t = 0;                                            // cursor in beats
+const sec = b => b * BEAT;
+function note(arr, beat, deg, oct, durB) { arr.push({ t: sec(beat), m: midi(deg, oct), d: sec(durB || 0.22) }); }
+function kick(b) { drums.push({ t: sec(b), k: 'k' }); }
+function snare(b) { drums.push({ t: sec(b), k: 's' }); }
+function hat(b) { drums.push({ t: sec(b), k: 'h' }); }
+function crash(b) { drums.push({ t: sec(b), k: 'c' }); }
+function chug(b, deg) { note(rhythm, b, deg, -1, 0.42); note(bass, b, deg, -1, 0.4); }
+
+// --- bars 0-3: arpeggio intro (the "synth run" vibe), 16ths ---
+const arp = [0, 2, 4, 7, 9, 11];
+for (let i = 0; i < 64; i++) {
+  const oct = Math.floor(i / 24), d = arp[i % 6] + 14 * Math.floor((i % 24) / 12);
+  note(lead, t + i * 0.25, d, oct, 0.24);
+}
+kick(t); snare(t + 8); crash(t); hat(t + 4); hat(t + 12);
+t += 16;
+
+// --- bars 4-11: gallop riff, low (8th-16th-16th per beat) ---
+function gallopRiff(base, roots) {
+  for (let b = 0; b < 16; b++) {
+    const r = roots[b % roots.length];
+    note(lead, base + b, r.deg, r.oct, 0.45);
+    note(lead, base + b + 0.5, r.deg, r.oct, 0.2);
+    note(lead, base + b + 0.75, r.deg + (r.up || 0), r.oct, 0.2);
+    chug(base + b, r.deg); chug(base + b + 0.5, r.deg); chug(base + b + 0.75, r.deg);
+    kick(base + b); kick(base + b + 0.75); hat(base + b); hat(base + b + 0.5);
+    if (b % 4 === 2) snare(base + b);
+    if (b % 4 === 0) snare(base + b + 0.5);
+  }
+}
+const riffRoots = [
+  { deg: 0, oct: 0 }, { deg: 0, oct: 0, up: 2 }, { deg: 5, oct: 0 }, { deg: 4, oct: 0, up: 1 },
+  { deg: 0, oct: 0 }, { deg: 3, oct: 0, up: 2 }, { deg: 5, oct: 0 }, { deg: 6, oct: 0, up: -1 },
+];
+crash(t); gallopRiff(t, riffRoots); t += 16;
+
+// --- bars 12-19: melodic verse, 8ths ---
+const verse = [4, 5, 7, 5, 4, 2, 4, 0, 4, 5, 7, 9, 7, 5, 4, 5,
+               4, 5, 7, 5, 4, 2, 4, 2, 6, 5, 4, 5, 6, 5, 4, 2];
+for (let i = 0; i < 32; i++) {
+  note(lead, t + i * 0.5, verse[i], 1, 0.45);
+  if (i % 2 === 0) { chug(t + i * 0.5, [0, 0, 3, 5][Math.floor(i / 8) % 4]); kick(t + i * 0.5); }
+  hat(t + i * 0.5); if (i % 4 === 2) snare(t + i * 0.5);
+}
+t += 16;
+
+// --- bars 20-27: shred solo, 16ths — runs up, sequence of 4s, arps down ---
+let s = 0;
+for (let i = 0; i < 32; i++, s += 0.25) note(lead, t + s, Math.floor(i / 4) + (i % 4), 1, 0.22);      // climb
+for (let i = 0; i < 32; i++, s += 0.25) {                                                            // 4-note sequences
+  const g = Math.floor(i / 4); note(lead, t + s, [7 + g, 5 + g, 6 + g, 4 + g][i % 4], 1, 0.22);
+}
+for (let i = 0; i < 32; i++, s += 0.25) {                                                            // arp descent
+  const seq = [14, 11, 9, 7, 4, 2, 0, -3]; note(lead, t + s, seq[Math.floor(i / 4)] - (i % 4), 1, 0.22);
+}
+for (let i = 0; i < 32; i++, s += 0.25) note(lead, t + s, 14 - Math.floor(i / 4) - (i % 4) * 0, 1, 0.22); // run down
+for (let b = 0; b < 16; b++) {
+  chug(t + b, b < 8 ? 0 : 3); kick(t + b); kick(t + b + 0.5); hat(t + b + 0.25); hat(t + b + 0.75);
+  if (b % 4 === 2) snare(t + b);
+}
+crash(t); t += 16;
+
+// --- bars 28-35: riff reprise, one octave up ---
+crash(t); gallopRiff(t, riffRoots.map(r => ({ ...r, oct: r.oct + 1 }))); t += 16;
+
+// --- bars 36-40: finale — quad stabs + long final note ---
+for (let i = 0; i < 4; i++) {
+  note(lead, t + i, 0, 1, 0.4); chug(t + i, 0); kick(t + i); snare(t + i + 0.5); crash(t + i);
+}
+note(lead, t + 4, 0, 1, 3.5); note(rhythm, t + 4, 0, -1, 3.5); note(bass, t + 4, 0, -1, 3.5);
+crash(t + 4); kick(t + 4);
+t += 8;
+const SONG_LEN = sec(t) + 1.5;
+
+// ============ CHART: lead notes -> lanes ============
+const laneOf = m => {
+  const rel = m - 64, oct = Math.floor(rel / 12), pc = rel - 12 * oct;
+  let rank = 0, best = 99;
+  SEMIS.forEach((s, i) => { const d = Math.abs(pc - s); if (d < best) { best = d; rank = i; } });
+  return Math.max(0, Math.min(4, Math.round(rank * 4 / 6) + oct));
+};
+const chart = lead.map(n => ({ t: n.t, lane: laneOf(n.m), hit: 0, missed: 0 }))
+                  .sort((a, b) => a.t - b.t);
+
+// ============ AUDIO: render whole song offline, play once ============
+let actx = null, songBuf = null, audioStart = 0, renderReady = false;
+async function renderSong() {
+  const sr = 44100, off = new OfflineAudioContext(2, Math.ceil((SONG_LEN + 1) * sr), sr);
+  const master = off.createGain(); master.gain.value = 0.8;
+  const dly = off.createDelay(); dly.delayTime.value = 0.21;
+  const fb = off.createGain(); fb.gain.value = 0.28;
+  const wet = off.createGain(); wet.gain.value = 0.16;
+  master.connect(off.destination);
+  dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(off.destination);
+
+  const voice = (m, at, dur, type, g0, lpF, send) => {
+    const o = off.createOscillator(), o2 = off.createOscillator(), g = off.createGain(), lp = off.createBiquadFilter();
+    o.type = type; o2.type = type; o.frequency.value = o2.frequency.value = freq(m);
+    o.detune.value = -6; o2.detune.value = 6;
+    lp.type = 'lowpass'; lp.frequency.value = lpF;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(g0, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+    o.connect(g); o2.connect(g); g.connect(lp); lp.connect(master); if (send) lp.connect(dly);
+    o.start(at); o2.start(at); o.stop(at + dur + 0.05); o2.stop(at + dur + 0.05);
+  };
+  const nz = (at, dur, g0, hpF) => {
+    const b = off.createBuffer(1, sr * dur, sr), ch = b.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    const src = off.createBufferSource(), g = off.createGain(), f = off.createBiquadFilter();
+    src.buffer = b; f.type = 'highpass'; f.frequency.value = hpF;
+    g.gain.setValueAtTime(g0, at); g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(at);
+  };
+  lead.forEach(n => voice(n.m, n.t, Math.max(n.d, 0.2), 'sawtooth', 0.11, 5200, true));
+  rhythm.forEach(n => { voice(n.m, n.t, n.d, 'sawtooth', 0.05, 1100, false);
+                        voice(n.m + 7, n.t, n.d, 'sawtooth', 0.05, 1100, false); });
+  bass.forEach(n => voice(n.m - 12, n.t, n.d, 'triangle', 0.16, 900, false));
+  drums.forEach(d => {
+    if (d.k === 'k') { const o = off.createOscillator(), g = off.createGain();
+      o.frequency.setValueAtTime(140, d.t); o.frequency.exponentialRampToValueAtTime(45, d.t + 0.1);
+      g.gain.setValueAtTime(0.5, d.t); g.gain.exponentialRampToValueAtTime(0.001, d.t + 0.12);
+      o.connect(g); g.connect(master); o.start(d.t); o.stop(d.t + 0.13); }
+    if (d.k === 's') nz(d.t, 0.12, 0.28, 1500);
+    if (d.k === 'h') nz(d.t, 0.04, 0.12, 7000);
+    if (d.k === 'c') nz(d.t, 0.8, 0.22, 4000);
+  });
+  songBuf = await off.startRendering();
+  renderReady = true;
+}
+renderSong();
+
+// ============ INPUT: GH controller (standard map) + keyboard ============
+// Verified on NBCP wireless guitar (Xbox 360 X-plorer dongle): frets A/B/Y/X/LB,
+// strum = dpad up+down, whammy = axes[2] rests -1.0, start = menu(9).
+const FRET_BTNS = [0, 1, 3, 2, 4];            // green red yellow blue orange
+const STRUM_BTNS = [12, 13], START_BTN = 9;
+const keys = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
+               KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3, KeyG: 4 };
+const frets = [0, 0, 0, 0, 0];
+let strumQueued = false, startQueued = false, lastStrumT = 0, prevBtns = [];
+let cal = +(localStorage.ghCal || 0);
+let gpInfo = 'no guitar', pressedNow = '';
+
+function pollGamepad() {
+  const gp = [...navigator.getGamepads()].find(g => g && g.buttons.length > 10);
+  if (!gp) { gpInfo = 'no guitar'; return; }
+  gpInfo = gp.id.slice(0, 42);
+  FRET_BTNS.forEach((b, i) => { if (gp.buttons[b]?.pressed) frets[i] = 1; });
+  pressedNow = gp.buttons.map((b, i) => b.pressed ? i : -1).filter(i => i >= 0).join(',')
+    + ' | ax2=' + (gp.axes[2] || 0).toFixed(2) + ' ax3=' + (gp.axes[3] || 0).toFixed(2);
+  const strum = STRUM_BTNS.some(b => gp.buttons[b]?.pressed);
+  if (strum && !prevBtns.strum && performance.now() - lastStrumT > 120) {
+    lastStrumT = performance.now(); strumQueued = true;
+  }
+  const start = gp.buttons[START_BTN]?.pressed;
+  if (start && !prevBtns.start) startQueued = true;
+  prevBtns = { strum, start };
+}
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code in keys) frets[keys[e.code]] = 1;
+  if (['Enter', 'Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) { strumQueued = true; e.preventDefault(); }
+  if (e.code === 'BracketLeft') { cal -= 0.01; localStorage.ghCal = cal; }
+  if (e.code === 'BracketRight') { cal += 0.01; localStorage.ghCal = cal; }
+  if (e.code === 'KeyP') auto = !auto;
+});
+addEventListener('keyup', e => { if (e.code in keys) frets[keys[e.code]] = 0; });
+
+// ============ GAME STATE ============
+const WIN = 0.13, APPROACH = 1.5;
+let screen = 'title', score = 0, streak = 0, best = 0, mult = 1, hits = 0, judged = 0;
+let judgeTxt = '', judgeT = 0, flashes = [], auto = false;
+const songTime = () => actx ? actx.currentTime - audioStart + cal : -9;
+
+function startGame() {
+  if (!actx) actx = new AudioContext();
+  if (actx.state === 'suspended') actx.resume();
+  if (!renderReady) return;
+  chart.forEach(n => { n.hit = 0; n.missed = 0; });
+  score = 0; streak = 0; best = 0; mult = 1; hits = 0; judged = 0; flashes = [];
+  const src = actx.createBufferSource(); src.buffer = songBuf; src.connect(actx.destination);
+  audioStart = actx.currentTime + 0.6; src.start(audioStart);
+  screen = 'play';
+}
+function judge() {
+  const st = songTime();
+  let bestN = null, bestDt = WIN;
+  for (const n of chart) {
+    if (n.hit || n.missed) continue;
+    const dt = st - n.t;
+    if (dt < -WIN) break;
+    if (Math.abs(dt) < bestDt) { bestDt = Math.abs(dt); bestN = n; }
+  }
+  if (bestN && frets[bestN.lane]) {
+    bestN.hit = 1; hits++; judged++; streak++; best = Math.max(best, streak);
+    mult = Math.min(4, 1 + Math.floor(streak / 10));
+    score += 50 * mult;
+    judgeTxt = bestDt < 0.06 ? 'PERFECT' : 'GOOD'; judgeT = performance.now();
+    flashes.push({ lane: bestN.lane, t: performance.now() });
+  }
+}
+const grade = () => { const a = judged ? hits / judged : 0;
+  return a > 0.97 ? 'S' : a > 0.9 ? 'A' : a > 0.8 ? 'B' : a > 0.65 ? 'C' : 'D'; };
+
+// ============ RENDER ============
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+const COLORS = ['#2fd24a', '#e8362f', '#f5d02a', '#2f7fe8', '#ff8a1f'];
+function frame() {
+  requestAnimationFrame(frame);
+  const W = cv.width = innerWidth * devicePixelRatio, H = cv.height = innerHeight * devicePixelRatio;
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const w = innerWidth, h = innerHeight;
+  pollGamepad();
+  const st = songTime();
+
+  if (screen === 'play') {
+    if (strumQueued) judge();
+    for (const n of chart) if (!n.hit && !n.missed && st - n.t > WIN) {
+      n.missed = 1; judged++; streak = 0; mult = 1; judgeTxt = 'MISS'; judgeT = performance.now();
+    }
+    if (auto) for (const n of chart) if (!n.hit && !n.missed && st - n.t > -0.03) {
+      n.hit = 1; hits++; judged++; streak++; best = Math.max(best, streak);
+      mult = Math.min(4, 1 + Math.floor(streak / 10)); score += 50 * mult;
+      flashes.push({ lane: n.lane, t: performance.now() });
+    }
+    if (st > chart[chart.length - 1].t + 2) screen = 'results';
+  }
+  if (startQueued || (strumQueued && screen !== 'play')) startGame();
+  strumQueued = false; startQueued = false;
+
+  // bg
+  const g = cx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#05050c'); g.addColorStop(1, '#141428');
+  cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+
+  const hitY = h - 150, topY = 90, cxm = w / 2;
+  const lx = (lane, y) => {  // lane x at depth y (perspective)
+    const p = (y - topY) / (hitY - topY);
+    return cxm + (lane - 2) * (34 + p * 82);
+  };
+  // highway
+  cx.beginPath();
+  cx.moveTo(lx(-0.5, topY), topY); cx.lineTo(lx(4.5, topY), topY);
+  cx.lineTo(lx(4.5, hitY + 60), hitY + 60); cx.lineTo(lx(-0.5, hitY + 60), hitY + 60);
+  cx.closePath(); cx.fillStyle = 'rgba(255,255,255,0.045)'; cx.fill();
+  for (let l = 0; l < 6; l++) {
+    cx.beginPath(); cx.moveTo(lx(l - 0.5, topY), topY); cx.lineTo(lx(l - 0.5, hitY + 60), hitY + 60);
+    cx.strokeStyle = 'rgba(255,255,255,0.14)'; cx.lineWidth = 2; cx.stroke();
+  }
+  // notes
+  if (screen === 'play' || screen === 'results') {
+    for (const n of chart) {
+      const prog = (n.t - st) / APPROACH;
+      if (prog < -0.06 || prog > 1.05 || n.hit) continue;
+      const y = hitY - prog * (hitY - topY), p = (y - topY) / (hitY - topY), r = 8 + p * 15;
+      cx.beginPath(); cx.arc(lx(n.lane, y), y, r, 0, 7);
+      cx.fillStyle = n.missed ? 'rgba(120,120,120,0.4)' : COLORS[n.lane];
+      cx.shadowColor = COLORS[n.lane]; cx.shadowBlur = n.missed ? 0 : 14;
+      cx.fill(); cx.shadowBlur = 0;
+      if (!n.missed) { cx.beginPath(); cx.arc(lx(n.lane, y), y, r * 0.45, 0, 7);
+        cx.fillStyle = 'rgba(255,255,255,0.85)'; cx.fill(); }
+    }
+  }
+  // hit line + fret targets
+  flashes = flashes.filter(f => performance.now() - f.t < 220);
+  for (let l = 0; l < 5; l++) {
+    const x = lx(l, hitY), held = frets[l];
+    cx.beginPath(); cx.arc(x, hitY, held ? 24 : 21, 0, 7);
+    cx.strokeStyle = COLORS[l]; cx.lineWidth = held ? 5 : 3;
+    cx.globalAlpha = held ? 1 : 0.55; cx.stroke(); cx.globalAlpha = 1;
+    if (held) { cx.beginPath(); cx.arc(x, hitY, 13, 0, 7); cx.fillStyle = COLORS[l]; cx.fill(); }
+    const f = flashes.find(f => f.lane === l);
+    if (f) { const p = (performance.now() - f.t) / 220;
+      cx.beginPath(); cx.arc(x, hitY, 24 + p * 30, 0, 7);
+      cx.strokeStyle = COLORS[l]; cx.globalAlpha = 1 - p; cx.lineWidth = 4; cx.stroke(); cx.globalAlpha = 1; }
+  }
+  // HUD
+  cx.fillStyle = '#fff'; cx.font = '700 26px Avenir Next,system-ui';
+  cx.textAlign = 'left'; cx.fillText(score.toLocaleString(), 30, 48);
+  cx.textAlign = 'right';
+  if (streak > 2) { cx.fillText(streak + '  ×' + mult, w - 30, 48); }
+  if (performance.now() - judgeT < 500 && screen === 'play') {
+    cx.textAlign = 'center'; cx.font = '800 34px Avenir Next,system-ui';
+    cx.fillStyle = judgeTxt === 'MISS' ? '#e8362f' : '#fff';
+    cx.globalAlpha = 1 - (performance.now() - judgeT) / 500;
+    cx.fillText(judgeTxt, cxm, hitY - 190); cx.globalAlpha = 1;
+  }
+  frets.fill(0);
+
+  if (screen === 'title') {
+    cx.textAlign = 'center'; cx.fillStyle = '#fff';
+    cx.font = '800 54px Avenir Next,system-ui';
+    cx.fillText('SHRED OF THE DRAGON', cxm, h * 0.32);
+    cx.font = '600 20px Avenir Next,system-ui'; cx.fillStyle = '#9a9ac0';
+    cx.fillText('an original browser guitar hero · ~200 BPM · 0% copyright', cxm, h * 0.32 + 42);
+    cx.font = '600 24px Avenir Next,system-ui'; cx.fillStyle = '#fff';
+    cx.fillText(renderReady ? 'strum or press ENTER to play' : 'rendering audio…', cxm, h * 0.52);
+    cx.font = '500 15px ui-monospace,monospace'; cx.fillStyle = '#777';
+    cx.fillText('frets 1-5 / A-G · strum Enter · P = watch mode · [ ] = calibrate ' + Math.round(cal * 1000) + 'ms', cxm, h * 0.52 + 36);
+    cx.fillText('guitar: ' + gpInfo, cxm, h - 60);
+    cx.fillText('pressed: ' + (pressedNow || '—'), cxm, h - 38);
+  }
+  if (screen === 'results') {
+    cx.textAlign = 'center'; cx.fillStyle = '#fff';
+    cx.font = '800 90px Avenir Next,system-ui'; cx.fillStyle = '#f5d02a';
+    cx.fillText(grade(), cxm, h * 0.3);
+    cx.fillStyle = '#fff'; cx.font = '700 34px Avenir Next,system-ui';
+    cx.fillText(score.toLocaleString(), cxm, h * 0.44);
+    cx.font = '500 20px Avenir Next,system-ui'; cx.fillStyle = '#9a9ac0';
+    const a = judged ? Math.round(100 * hits / judged) : 0;
+    cx.fillText(hits + '/' + judged + ' notes · ' + a + '% · best streak ' + best, cxm, h * 0.44 + 40);
+    cx.fillStyle = '#fff'; cx.fillText('strum or press ENTER to play again', cxm, h * 0.62);
+  }
+}
+frame();
+</script>
+</body>
+</html>
